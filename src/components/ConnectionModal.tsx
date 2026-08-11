@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ConnectionDetails } from '../hooks/useOBSWebSocket';
-import { Settings2, Zap } from 'lucide-react';
+import { Settings2, Zap, AlertCircle } from 'lucide-react';
 
 interface Props {
   onConnect: (details: ConnectionDetails) => Promise<void>;
@@ -34,6 +34,14 @@ export function ConnectionModal({ onConnect }: Props) {
         </div>
         
         <form onSubmit={(e) => handleSubmit(e, false)} className="p-6 flex flex-col gap-4">
+          <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/20 p-3 rounded text-[11px] text-yellow-200/90 leading-relaxed">
+            <AlertCircle className="w-4 h-4 text-yellow-500 shrink-0 mt-0.5" />
+            <div>
+              <strong className="text-yellow-500">Connection Notice:</strong> If this app is hosted on HTTPS (like GitHub Pages), your browser will block the connection to OBS by default due to Mixed Content (wss:// vs ws://).<br/>
+              <span className="opacity-80">To fix this in Chrome: Click the lock/tune icon next to the URL ➔ Site settings ➔ Allow <strong>Insecure content</strong>.</span>
+            </div>
+          </div>
+
           {error && <div className="p-3 bg-obs-red/20 border border-obs-red text-obs-red text-sm rounded">{error}</div>}
           
           <div className="flex flex-col gap-1">
