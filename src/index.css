@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-obs-bg text-obs-text overflow-hidden antialiased;
+    font-family: "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+  }
+}
+
+/* Scrollbars to match classic OBS */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-[#1a1a1a] border-l border-obs-border;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-[#4d4d4d] border-[3px] border-solid border-[#1a1a1a];
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-[#5a5a5a];
+}
+
+::-webkit-scrollbar-thumb:active {
+  @apply bg-[#666666];
+}
+
+::-webkit-scrollbar-corner {
+  @apply bg-[#1a1a1a];
+}
+
+/* Remove all glassmorphism */
+.glass-panel {
+  @apply bg-obs-dock;
+}
+
+/* Selection */
+::selection {
+  @apply bg-obs-accent text-white;
+}
+
+
+
+input[type=range]:focus {
+  outline: none;
+}
