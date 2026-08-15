@@ -197,8 +197,15 @@ export function useOBSWebSocket() {
         ['Desktop Audio', 'Application Capture'].forEach(inputName => {
           const callbacks = meterCallbacks.current.get(inputName);
           if (callbacks && callbacks.length > 0) {
-            // Fake random audio levels bouncing
-            const mul = Math.abs(Math.sin(Date.now() / 200)) * 0.8 + (Math.random() * 0.2);
+            // Fake realistic audio levels bouncing
+            // Math.pow gives sharp peaks, and we allow it to drop to very low values (0.001)
+            const sine = Math.abs(Math.sin(Date.now() / 300));
+            let mul = Math.pow(sine, 6) * 0.9;
+            // Add a small baseline noise floor occasionally
+            if (Math.random() > 0.8) {
+               mul += Math.random() * 0.05;
+            }
+            if (mul < 0.001) mul = 0.001; // drop to -60dB
             callbacks.forEach(cb => cb(mul));
           }
         });
@@ -562,7 +569,7 @@ export function useOBSWebSocket() {
     try {
       const response = await obs.current.call('GetInputSettings', { inputName });
       
-      let defaultSettings = {};
+      let defaultSettings: Record<string, any> = {};
       if (response.inputKind) {
         try {
           const defaultResponse = await obs.current.call('GetInputDefaultSettings', { inputKind: response.inputKind });
@@ -573,7 +580,7 @@ export function useOBSWebSocket() {
       }
 
       const propertyLists: Record<string, any[]> = {};
-      const combinedSettings = { ...defaultSettings, ...(response.inputSettings || {}) };
+      const combinedSettings: Record<string, any> = { ...defaultSettings, ...(response.inputSettings || {}) };
       
       const knownListProperties = [
         'window', 'monitor', 'video_device_id', 'audio_device_id', 'device_id', 'font'
