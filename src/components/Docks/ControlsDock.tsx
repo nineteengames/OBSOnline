@@ -5,6 +5,8 @@ interface Props {
   isStreaming: boolean;
   isVirtualCam: boolean;
   isStudioModeEnabled: boolean;
+  recordTimecode: string;
+  streamTimecode: string;
   onToggleRecording: () => void;
   onToggleStreaming: () => void;
   onToggleVirtualCam: () => void;
@@ -16,13 +18,15 @@ export function ControlsDock({
   isStreaming,
   isVirtualCam,
   isStudioModeEnabled,
+  recordTimecode,
+  streamTimecode,
   onToggleRecording,
   onToggleStreaming,
   onToggleVirtualCam,
   onToggleStudioMode
 }: Props) {
   
-  const baseButtonClass = "w-full justify-start h-7 text-[13px] font-normal rounded-sm bg-obs-button hover:bg-obs-buttonHover text-obs-textLight border-transparent";
+  const baseButtonClass = "w-full justify-start h-7 text-[13px] font-normal rounded-sm bg-obs-button hover:bg-obs-buttonHover text-obs-textLight border-transparent px-2";
   
   return (
     <div className="flex flex-col p-1 gap-[2px] bg-obs-dock h-full">
@@ -31,7 +35,10 @@ export function ControlsDock({
         onClick={onToggleStreaming}
         className={`${baseButtonClass} ${isStreaming ? 'bg-obs-green hover:bg-green-600 text-white' : ''}`}
       >
-        <span>{isStreaming ? 'Stop Streaming' : 'Start Streaming'}</span>
+        <div className="flex w-full justify-between items-center">
+          <span>{isStreaming ? 'Stop Streaming' : 'Start Streaming'}</span>
+          {isStreaming && streamTimecode && <span className="text-[10px] font-mono text-white/90">{streamTimecode.split('.')[0]}</span>}
+        </div>
       </Button>
       
       <Button 
@@ -39,7 +46,10 @@ export function ControlsDock({
         onClick={onToggleRecording}
         className={`${baseButtonClass} ${isRecording ? 'bg-obs-red hover:bg-red-600 text-white' : ''}`}
       >
-        <span>{isRecording ? 'Stop Recording' : 'Start Recording'}</span>
+        <div className="flex w-full justify-between items-center">
+          <span>{isRecording ? 'Stop Recording' : 'Start Recording'}</span>
+          {isRecording && recordTimecode && <span className="text-[10px] font-mono text-white/90">{recordTimecode.split('.')[0]}</span>}
+        </div>
       </Button>
       
       <Button 

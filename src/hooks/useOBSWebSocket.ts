@@ -15,9 +15,12 @@ export function useOBSWebSocket() {
   const [scenes, setScenes] = useState<OBSScene[]>([]);
   const [currentScene, setCurrentScene] = useState<string>('');
   const [sceneItems, setSceneItems] = useState<OBSSceneItem[]>([]);
+  const [inputKinds, setInputKinds] = useState<{ value: string, label: string }[]>([]);
   const [audioInputs, setAudioInputs] = useState<OBSAudioInput[]>([]);
   const [isRecording, setIsRecording] = useState(false);
+  const [recordTimecode, setRecordTimecode] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamTimecode, setStreamTimecode] = useState("");
   const [isVirtualCam, setIsVirtualCam] = useState(false);
   const [isStudioModeEnabled, setIsStudioModeEnabled] = useState(false);
   const [previewScene, setPreviewScene] = useState<string>('');
@@ -123,6 +126,15 @@ export function useOBSWebSocket() {
         { sceneItemId: 1, sourceName: 'Camera', sceneItemEnabled: true, sceneItemLocked: true, sourceType: 'INPUT_VIDEO' },
         { sceneItemId: 2, sourceName: 'Display Capture', sceneItemEnabled: true, sceneItemLocked: false, sourceType: 'INPUT_VIDEO' },
         { sceneItemId: 3, sourceName: 'Chat Overlay', sceneItemEnabled: false, sceneItemLocked: false, sourceType: 'INPUT_BROWSER' },
+        { sceneItemId: 4, sourceName: 'Group Example', sceneItemEnabled: true, sceneItemLocked: false, sourceType: 'OBS_SOURCE_TYPE_SCENE', isGroup: true, children: [
+          { sceneItemId: 5, sourceName: 'Inner Browser', sceneItemEnabled: true, sceneItemLocked: false, sourceType: 'INPUT_BROWSER' }
+        ] },
+      ]);
+      setInputKinds([
+        { value: 'dshow_input', label: 'Video Capture Device' },
+        { value: 'browser_source', label: 'Browser' },
+        { value: 'ffmpeg_source', label: 'Media Source' },
+        { value: 'window_capture', label: 'Window Capture' },
       ]);
       setAudioInputs([
         { inputName: 'Desktop Audio', inputKind: 'wasapi_output_capture', unmuted: true, inputVolumeDb: -10, inputVolumeMul: 0.5, inputSettings: { device_id: 'default' } },
@@ -214,6 +226,14 @@ export function useOBSWebSocket() {
         });
       });
 
+      obs.current.on('InputMuteStateChanged', (data) => {
+        setAudioInputs(prev => prev.map(input => input.inputName === data.inputName ? { ...input, unmuted: !data.inputMuted } : input));
+      });
+
+      obs.current.on('InputVolumeChanged', (data) => {
+        setAudioInputs(prev => prev.map(input => input.inputName === data.inputName ? { ...input, inputVolumeMul: data.inputVolumeMul } : input));
+      });
+
       obs.current.on('CustomEvent', () => {
         // Handle stats if broadcasted, otherwise we might need to poll GetStats or use vendor events
       });
@@ -230,7 +250,15 @@ export function useOBSWebSocket() {
       
       obs.current.on('SceneListChanged', (data) => {
         // @ts-ignore
-        setScenes(data.scenes.map((s: any) => ({ sceneIndex: s.sceneIndex, sceneName: s.sceneName })));
+        setScenes(data.scenes.map((s: any) => ({ sceneIndex: s.sceneIndex, sceneName: s.sceneName })).reverse());
+      });
+      
+      obs.current.on('RecordStateChanged', (data) => {
+        setIsRecording(data.outputActive);
+      });
+      
+      obs.current.on('StreamStateChanged', (data) => {
+        setIsStreaming(data.outputActive);
       });
       
       // Fetch initial states
@@ -254,10 +282,16 @@ export function useOBSWebSocket() {
       setPreviewScene(currentPreviewSceneName || currentProgramSceneName);
       setIsStudioModeEnabled(studioModeEnabled);
       // @ts-ignore
-      setScenes(sceneList.map((s: any) => ({ sceneIndex: s.sceneIndex, sceneName: s.sceneName })));
+      setScenes(sceneList.map((s: any) => ({ sceneIndex: s.sceneIndex, sceneName: s.sceneName })).reverse());
       // @ts-ignore
       setTransitions(transitionList);
       setCurrentTransition(currentSceneTransitionName);
+
+      obs.current.call('GetInputKindList').then(data => {
+        if (data.inputKinds) {
+          setInputKinds(data.inputKinds.map((k: string) => ({ value: k, label: k })));
+        }
+      }).catch(() => {});
 
       fetchSceneItems(currentProgramSceneName);
       fetchAudioInputs();
@@ -266,13 +300,23 @@ export function useOBSWebSocket() {
       window.setInterval(async () => {
         if (!isMockMode && obs.current) {
           try {
-            const stats = await obs.current.call('GetStats');
+            const [stats, recordStatus, streamStatus] = await Promise.all([
+              obs.current.call('GetStats').catch(() => ({ cpuUsage: 0, memoryUsage: 0, activeFps: 0, averageFrameRenderTime: 0 })),
+              obs.current.call('GetRecordStatus').catch(() => ({ outputActive: false, outputTimecode: "" })),
+              obs.current.call('GetStreamStatus').catch(() => ({ outputActive: false, outputTimecode: "" }))
+            ]);
+            
             setObsStats({
               cpuUsage: stats.cpuUsage,
               memoryUsage: stats.memoryUsage,
               activeFps: stats.activeFps,
               averageFrameRenderTime: stats.averageFrameRenderTime
             });
+            
+            setIsRecording(recordStatus.outputActive);
+            setRecordTimecode(recordStatus.outputTimecode);
+            setIsStreaming(streamStatus.outputActive);
+            setStreamTimecode(streamStatus.outputTimecode);
           } catch (e) {}
         }
       }, 2000);
@@ -287,6 +331,26 @@ export function useOBSWebSocket() {
     if (isMockMode) return;
     try {
       const { sceneItems: items } = await obs.current.call('GetSceneItemList', { sceneName });
+      
+      const fetchChildren = async (itemsList: any[]) => {
+        for (const item of itemsList) {
+          if (item.isGroup) {
+            try {
+              const { sceneItems: children } = await obs.current.call('GetGroupSceneItemList', { sceneName: item.sourceName });
+              item.children = children.reverse();
+              await fetchChildren(item.children);
+            } catch (e) {
+              console.error(e);
+            }
+          }
+        }
+      };
+      
+      if (items) {
+        items.reverse();
+        await fetchChildren(items);
+      }
+      
       // @ts-ignore
       setSceneItems(items);
     } catch (e) {
@@ -426,6 +490,37 @@ export function useOBSWebSocket() {
     await obs.current.call('SetInputVolume', { inputName, inputVolumeMul: volumeMul });
   };
 
+  const setSourceIndex = async (sceneItemId: number, sceneItemIndex: number) => {
+    if (isMockMode) return;
+    try {
+      await obs.current.call('SetSceneItemIndex', { sceneName: currentScene, sceneItemId, sceneItemIndex });
+      fetchSceneItems(currentScene);
+    } catch (e) {
+      console.error('Failed to set source index', e);
+    }
+  };
+
+  const createSource = async (inputName: string, inputKind: string) => {
+    if (isMockMode) return;
+    try {
+      await obs.current.call('CreateInput', { sceneName: currentScene, inputName, inputKind });
+      fetchSceneItems(currentScene);
+    } catch (e) {
+      console.error('Failed to create source', e);
+      throw e;
+    }
+  };
+
+  const removeSource = async (sceneItemId: number) => {
+    if (isMockMode) return;
+    try {
+      await obs.current.call('RemoveSceneItem', { sceneName: currentScene, sceneItemId });
+      fetchSceneItems(currentScene);
+    } catch (e) {
+      console.error('Failed to remove source', e);
+    }
+  };
+
   const toggleAudioFilter = async (inputName: string, filterName: string, enabled: boolean) => {
     setAudioFilters(prev => ({
       ...prev,
@@ -467,10 +562,28 @@ export function useOBSWebSocket() {
     try {
       const response = await obs.current.call('GetInputSettings', { inputName });
       
+      let defaultSettings = {};
+      if (response.inputKind) {
+        try {
+          const defaultResponse = await obs.current.call('GetInputDefaultSettings', { inputKind: response.inputKind });
+          defaultSettings = defaultResponse.defaultInputSettings || {};
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const propertyLists: Record<string, any[]> = {};
+      const combinedSettings = { ...defaultSettings, ...(response.inputSettings || {}) };
       
-      if (response.inputSettings) {
-        await Promise.all(Object.keys(response.inputSettings).map(async (key) => {
+      const knownListProperties = [
+        'window', 'monitor', 'video_device_id', 'audio_device_id', 'device_id', 'font'
+      ];
+      
+      // Combine all keys we know about, plus the standard ones we want to enforce checking
+      const keysToCheck = Array.from(new Set([...Object.keys(combinedSettings), ...knownListProperties]));
+
+      if (keysToCheck.length > 0) {
+        await Promise.all(keysToCheck.map(async (key) => {
           try {
             const listData = await obs.current.call('GetInputPropertiesListPropertyItems', {
               inputName,
@@ -478,14 +591,18 @@ export function useOBSWebSocket() {
             });
             if (listData && listData.propertyItems && listData.propertyItems.length > 0) {
               propertyLists[key] = listData.propertyItems;
+              // If this was a known property but missing from settings, initialize it so it shows up in UI
+              if (combinedSettings[key] === undefined) {
+                combinedSettings[key] = listData.propertyItems[0]?.itemValue ?? '';
+              }
             }
           } catch (e) {
-            // Ignore
+            // Ignore if property doesn't exist for this source
           }
         }));
       }
       
-      return { ...response, propertyLists };
+      return { ...response, inputSettings: combinedSettings, propertyLists };
     } catch (e) {
       console.error(`Failed to get settings for ${inputName}`, e);
       return null;
@@ -514,12 +631,15 @@ export function useOBSWebSocket() {
     currentTransition,
     obsStats,
     sceneItems,
+    inputKinds,
     audioInputs,
     audioFilters,
     inputPropertiesMap,
     previewImage,
     isRecording,
+    recordTimecode,
     isStreaming,
+    streamTimecode,
     isVirtualCam,
     connect,
     disconnect,
@@ -540,5 +660,8 @@ export function useOBSWebSocket() {
     toggleStreaming: () => setIsStreaming(!isStreaming),
     toggleVirtualCam: () => setIsVirtualCam(!isVirtualCam),
     getInputSettings,
+    setSourceIndex,
+    createSource,
+    removeSource,
   };
 }

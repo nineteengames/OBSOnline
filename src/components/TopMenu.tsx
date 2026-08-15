@@ -38,7 +38,7 @@ export function TopMenu({ dockVisibility, onToggleDock, onDisconnect }: Props) {
 
   return (
     <div className="h-7 bg-obs-header flex items-center px-2 text-xs gap-1 text-obs-text select-none border-b border-obs-border" ref={menuRef}>
-      <div className="font-semibold px-2 mr-2">OBSOnline Pro</div>
+      <div className="font-semibold px-2 mr-2">OBSOnline</div>
       
       {/* File Menu */}
       <div className="relative">

@@ -6,6 +6,8 @@ interface StatusBarProps {
   activeFps: number;
   isRecording: boolean;
   isStreaming: boolean;
+  recordTimecode: string;
+  streamTimecode: string;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -13,15 +15,20 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   memoryUsage,
   activeFps,
   isRecording,
-  isStreaming
+  isStreaming,
+  recordTimecode,
+  streamTimecode
 }) => {
+  const recTime = recordTimecode ? recordTimecode.split('.')[0] : '00:00:00';
+  const streamTime = streamTimecode ? streamTimecode.split('.')[0] : '00:00:00';
+
   return (
     <div className="h-6 w-full bg-obs-header border-t border-obs-border flex items-center justify-between px-2 text-[11px] text-obs-text select-none">
       <div className="flex items-center gap-4">
         {isRecording ? (
           <div className="flex items-center gap-1.5 text-obs-textLight">
             <div className="w-2 h-2 rounded-full bg-obs-red" />
-            REC: 00:00:00
+            REC: {recTime}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-obs-text">
@@ -32,7 +39,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         {isStreaming ? (
           <div className="flex items-center gap-1.5 text-obs-textLight">
             <div className="w-2 h-2 rounded-full bg-obs-green" />
-            LIVE: 00:00:00
+            LIVE: {streamTime}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-obs-text">

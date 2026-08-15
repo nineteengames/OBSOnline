@@ -72,11 +72,14 @@ export const SourcePropertiesModal: React.FC<SourcePropertiesModalProps> = ({
                     <select
                       id={id}
                       value={value?.toString() || ''}
-                      onChange={(e) => handleChange(key, e.target.value)}
+                      onChange={(e) => {
+                        const selectedItem = propertyLists[key].find(i => i.itemValue?.toString() === e.target.value);
+                        handleChange(key, selectedItem !== undefined ? selectedItem.itemValue : e.target.value);
+                      }}
                       className="h-7 text-xs bg-[#111111] border border-obs-border rounded-none text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-obs-accent px-1.5 cursor-pointer"
                     >
                       {propertyLists[key].map((item: any, idx: number) => (
-                        <option key={idx} value={item.itemValue} disabled={item.itemEnabled === false}>
+                        <option key={idx} value={item.itemValue?.toString()} disabled={item.itemEnabled === false}>
                           {item.itemName}
                         </option>
                       ))}

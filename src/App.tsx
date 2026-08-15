@@ -9,6 +9,7 @@ import { StatusBar } from './components/StatusBar';
 import { SourcePropertiesModal } from './components/SourcePropertiesModal';
 import { TopMenu } from './components/TopMenu';
 import { SortableDock } from './components/Docks/SortableDock';
+import { AddSourceModal } from './components/AddSourceModal';
 
 import {
   DndContext,
@@ -31,6 +32,8 @@ type DockId = 'scenes' | 'sources' | 'audio' | 'transitions' | 'controls';
 function App() {
   const obs = useOBSWebSocket();
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
+  const [propertiesSource, setPropertiesSource] = useState<string | null>(null);
+  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
   
   const [dockVisibility, setDockVisibility] = useState<Record<DockId, boolean>>({
     scenes: true,
@@ -109,12 +112,21 @@ function App() {
                 items={obs.sceneItems} 
                 onToggleVisibility={obs.setItemEnabled} 
                 onToggleLock={obs.setItemLocked}
-                onDoubleClick={(itemName) => setSelectedSource(itemName)}
+                onDoubleClick={(itemName) => setPropertiesSource(itemName)}
+                selectedItem={selectedSource}
+                onSelect={(itemName) => setSelectedSource(itemName)}
+                onReorder={obs.setSourceIndex}
               />
             </div>
             <div className="h-7 bg-obs-dock border-t border-obs-border flex items-center px-1 gap-1">
-               <div className="w-5 h-5 flex items-center justify-center text-obs-text hover:bg-obs-buttonHover cursor-pointer font-bold">+</div>
-               <div className="w-5 h-5 flex items-center justify-center text-obs-text hover:bg-obs-buttonHover cursor-pointer font-bold">-</div>
+               <div onClick={() => setIsAddSourceModalOpen(true)} className="w-5 h-5 flex items-center justify-center text-obs-text hover:bg-obs-buttonHover cursor-pointer font-bold">+</div>
+               <div onClick={() => {
+                 const item = obs.sceneItems?.find(i => i.sourceName === selectedSource);
+                 if (item) {
+                   obs.removeSource(item.sceneItemId);
+                   setSelectedSource(null);
+                 }
+               }} className="w-5 h-5 flex items-center justify-center text-obs-text hover:bg-obs-buttonHover cursor-pointer font-bold">-</div>
                <div className="w-5 h-5 flex items-center justify-center text-obs-text hover:bg-obs-buttonHover cursor-pointer font-bold ml-auto text-[10px]">⚙</div>
             </div>
           </SortableDock>
@@ -157,10 +169,12 @@ function App() {
                 isRecording={obs.isRecording}
                 isStreaming={obs.isStreaming}
                 isVirtualCam={obs.isVirtualCam}
+                isStudioModeEnabled={obs.isStudioModeEnabled}
+                recordTimecode={obs.recordTimecode}
+                streamTimecode={obs.streamTimecode}
                 onToggleRecording={obs.toggleRecording}
                 onToggleStreaming={obs.toggleStreaming}
                 onToggleVirtualCam={obs.toggleVirtualCam}
-                isStudioModeEnabled={obs.isStudioModeEnabled}
                 onToggleStudioMode={obs.toggleStudioMode}
               />
             </div>
@@ -218,12 +232,12 @@ function App() {
               <div className="absolute top-2 right-2 flex items-center gap-2 bg-obs-header/80 px-2 py-1 border border-obs-border text-[10px] text-obs-text">
                 <div className="flex items-center gap-1 font-medium">
                   <div className={`w-2 h-2 rounded-full ${obs.isRecording ? 'bg-obs-red animate-pulse' : 'bg-gray-500'}`} />
-                  REC
+                  REC {obs.isRecording && obs.recordTimecode && <span className="ml-1 text-[9px] text-obs-textLight">{obs.recordTimecode.split('.')[0]}</span>}
                 </div>
                 <div className="w-px h-3 bg-obs-border" />
                 <div className="flex items-center gap-1 font-medium">
                   <div className={`w-2 h-2 rounded-full ${obs.isStreaming ? 'bg-obs-green animate-pulse' : 'bg-gray-500'}`} />
-                  LIVE
+                  LIVE {obs.isStreaming && obs.streamTimecode && <span className="ml-1 text-[9px] text-obs-textLight">{obs.streamTimecode.split('.')[0]}</span>}
                 </div>
               </div>
             </div>
@@ -253,14 +267,24 @@ function App() {
         activeFps={obs.obsStats.activeFps}
         isRecording={obs.isRecording}
         isStreaming={obs.isStreaming}
+        recordTimecode={obs.recordTimecode}
+        streamTimecode={obs.streamTimecode}
       />
       
-      {selectedSource && (
+      {propertiesSource && (
         <SourcePropertiesModal 
-          sourceName={selectedSource} 
-          onClose={() => setSelectedSource(null)}
+          sourceName={propertiesSource} 
+          onClose={() => setPropertiesSource(null)}
           getInputSettings={obs.getInputSettings}
           updateInputSettings={obs.updateInputSettings}
+        />
+      )}
+
+      {isAddSourceModalOpen && (
+        <AddSourceModal 
+          onClose={() => setIsAddSourceModalOpen(false)}
+          onAdd={(name, kind) => obs.createSource(name, kind)}
+          inputKinds={obs.inputKinds}
         />
       )}
     </div>

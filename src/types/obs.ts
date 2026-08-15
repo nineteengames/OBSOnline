@@ -5,10 +5,13 @@ export interface OBSScene {
 
 export interface OBSSceneItem {
   sceneItemId: number;
+  sceneItemIndex?: number;
   sourceName: string;
   sceneItemEnabled: boolean;
   sceneItemLocked: boolean;
   sourceType: string;
+  isGroup?: boolean;
+  children?: OBSSceneItem[];
 }
 
 export interface OBSAudioInput {
